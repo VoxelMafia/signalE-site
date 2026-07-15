@@ -1,0 +1,459 @@
+<title>SignalE — Global Energy Impact Model</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    /* light (default) */
+    --bg: #eef2f2;
+    --panel: #ffffff;
+    --panel-2: #f5f8f8;
+    --ink: #10201f;
+    --muted: #566b6a;
+    --faint: #8ba0a0;
+    --line: #d6e0df;
+    --line-strong: #bccac9;
+    --accent: #0c8f9f;
+    --accent-ink: #0a6d79;
+    --clean: #1f9d5b;
+    --neutral: #c78319;
+    --dirty: #d24327;
+    --shadow: 0 1px 2px rgba(16,32,31,.06), 0 8px 30px rgba(16,32,31,.05);
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", "JetBrains Mono", Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c1213;
+      --panel: #121b1d;
+      --panel-2: #172225;
+      --ink: #e7efef;
+      --muted: #93a7a7;
+      --faint: #61787a;
+      --line: #22312f;
+      --line-strong: #31433f;
+      --accent: #2ccadd;
+      --accent-ink: #7fe4f0;
+      --clean: #43c07a;
+      --neutral: #e0a63e;
+      --dirty: #ec6047;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 14px 40px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0c1213; --panel: #121b1d; --panel-2: #172225; --ink: #e7efef;
+    --muted: #93a7a7; --faint: #61787a; --line: #22312f; --line-strong: #31433f;
+    --accent: #2ccadd; --accent-ink: #7fe4f0; --clean: #43c07a; --neutral: #e0a63e;
+    --dirty: #ec6047; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 14px 40px rgba(0,0,0,.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #eef2f2; --panel: #ffffff; --panel-2: #f5f8f8; --ink: #10201f;
+    --muted: #566b6a; --faint: #8ba0a0; --line: #d6e0df; --line-strong: #bccac9;
+    --accent: #0c8f9f; --accent-ink: #0a6d79; --clean: #1f9d5b; --neutral: #c78319;
+    --dirty: #d24327; --shadow: 0 1px 2px rgba(16,32,31,.06), 0 8px 30px rgba(16,32,31,.05);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.55;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 22px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--accent-ink); font-weight: 600;
+  }
+  h1, h2, h3 { text-wrap: balance; line-height: 1.12; margin: 0; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---- header ---- */
+  header { border-bottom: 1px solid var(--line); position: relative; overflow: hidden; }
+  #trace { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .5; z-index: 0; }
+  .hero { position: relative; z-index: 1; padding: 46px 0 40px; }
+  .brand { display: flex; align-items: center; gap: 11px; margin-bottom: 26px; }
+  .dot {
+    width: 11px; height: 11px; border-radius: 50%; background: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .brand b { font-family: var(--mono); letter-spacing: .04em; font-size: 15px; }
+  .hero h1 { font-size: clamp(30px, 5vw, 50px); font-weight: 780; letter-spacing: -.02em; }
+  .hero .lede { color: var(--muted); max-width: 60ch; margin-top: 16px; font-size: 17px; }
+
+  /* ---- live readout ---- */
+  .readout {
+    margin: 26px 0 6px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 16px; box-shadow: var(--shadow); overflow: hidden;
+  }
+  .readout-top {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+    background: var(--line);
+  }
+  .metric { background: var(--panel); padding: 26px 28px; }
+  .metric .label {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center;
+  }
+  .metric .big {
+    font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: clamp(38px, 7vw, 60px); font-weight: 620; letter-spacing: -.02em;
+    line-height: 1; margin: 12px 0 6px; color: var(--ink);
+  }
+  .metric .big small { font-size: .34em; color: var(--muted); font-weight: 500; letter-spacing: 0; }
+  .metric .band { font-family: var(--mono); font-size: 12.5px; color: var(--faint); }
+  .metric .eq { margin-top: 12px; font-size: 13.5px; color: var(--muted); }
+  .metric .eq b { color: var(--ink); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  /* uncertainty range: P10 —●— P90 */
+  .rangebar { position: relative; height: 7px; margin-top: 14px; border-radius: 7px; background: var(--line-strong); }
+  .rangebar .fill { position: absolute; top: 0; bottom: 0; border-radius: 7px; background: color-mix(in srgb, var(--accent) 42%, transparent); }
+  .rangebar .p50dot { position: absolute; top: -3px; width: 3px; height: 13px; border-radius: 2px; background: var(--accent); }
+  .rangelabels { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; letter-spacing: .08em; color: var(--faint); margin-top: 5px; text-transform: uppercase; }
+
+  /* savings origins */
+  .origins { display: grid; gap: 11px; }
+  .origin { display: grid; grid-template-columns: 220px 1fr 46px; align-items: center; gap: 14px; }
+  .origin .oname { font-size: 13.5px; color: var(--ink); }
+  .origin .otrack { height: 13px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); overflow: hidden; }
+  .origin .ofill { height: 100%; border-radius: 3px 0 0 3px; background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--clean))); }
+  .origin .opct { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; text-align: right; color: var(--accent-ink); }
+  @media (max-width: 560px) { .origin { grid-template-columns: 1fr 46px; } .origin .otrack { grid-column: 1 / -1; order: 3; } }
+
+  .control { padding: 22px 28px; border-top: 1px solid var(--line); background: var(--panel-2); }
+  .control .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .control .row .k { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .control .row .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 620; color: var(--accent-ink); }
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 6px; margin: 16px 0 6px; background: linear-gradient(90deg, var(--accent) 0%, var(--accent) var(--pct,25%), var(--line-strong) var(--pct,25%)); outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: var(--panel); border: 3px solid var(--accent); box-shadow: var(--shadow); cursor: pointer; }
+  input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border-radius: 50%; background: var(--panel); border: 3px solid var(--accent); cursor: pointer; }
+  input[type=range]:focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, transparent); }
+  .ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10.5px; color: var(--faint); }
+
+  /* ---- sections ---- */
+  section { padding: 48px 0; border-bottom: 1px solid var(--line); }
+  .sec-head { margin-bottom: 26px; }
+  .sec-head h2 { font-size: clamp(21px, 3vw, 27px); font-weight: 720; letter-spacing: -.01em; margin-top: 8px; }
+  .sec-head p { color: var(--muted); max-width: 66ch; margin: 10px 0 0; }
+
+  /* scenario strip */
+  .scen { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; box-shadow: var(--shadow); }
+  .card .tag { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); }
+  .card .pct { font-family: var(--mono); font-size: 34px; font-weight: 640; letter-spacing: -.02em; margin: 4px 0 2px; }
+  .card .desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  .card .stat { display: flex; justify-content: space-between; padding: 7px 0; border-top: 1px dashed var(--line); font-size: 13.5px; }
+  .card .stat span { color: var(--muted); }
+  .card .stat b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* carbon chart */
+  .chart-wrap { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px 20px 16px; box-shadow: var(--shadow); }
+  .chart { display: flex; align-items: flex-end; gap: 3px; height: 210px; padding-top: 8px; }
+  .bar { flex: 1; border-radius: 3px 3px 0 0; min-height: 3px; position: relative; transition: opacity .15s; }
+  .bar:hover { opacity: .78; }
+  .xaxis { display: flex; gap: 3px; margin-top: 8px; }
+  .xaxis span { flex: 1; text-align: center; font-family: var(--mono); font-size: 9px; color: var(--faint); }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 18px; font-size: 12.5px; color: var(--muted); }
+  .legend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; vertical-align: -1px; margin-right: 6px; }
+  .callout { margin-top: 16px; padding: 14px 16px; border-left: 3px solid var(--clean); background: var(--panel-2); border-radius: 0 8px 8px 0; font-size: 14px; color: var(--ink); }
+  .callout b { font-family: var(--mono); }
+
+  /* mechanisms */
+  .mech { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .mech .card h3 { font-size: 18px; display: flex; align-items: center; gap: 10px; }
+  .mech .card h3 .k { font-family: var(--mono); font-size: 12px; color: var(--panel); background: var(--accent); padding: 2px 8px; border-radius: 6px; font-weight: 700; }
+  .mech .card p { color: var(--muted); font-size: 14px; margin: 12px 0 0; }
+  .mech .card .fx { margin-top: 14px; font-family: var(--mono); font-size: 13px; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+
+  /* integrity */
+  .rules { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+  .rules li { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; color: var(--muted); font-size: 14.5px; }
+  .rules li b { color: var(--ink); }
+  .check { font-family: var(--mono); color: var(--clean); font-weight: 700; }
+
+  footer { padding: 34px 0 60px; color: var(--faint); font-size: 13px; }
+  footer code { font-family: var(--mono); background: var(--panel-2); padding: 2px 7px; border-radius: 5px; color: var(--muted); border: 1px solid var(--line); }
+  .disclaim { margin-top: 10px; max-width: 74ch; }
+  footer a.ghlink { display: inline-block; font-family: var(--mono); font-size: 13.5px; font-weight: 600;
+    color: var(--panel); background: var(--accent); padding: 9px 16px; border-radius: 9px; text-decoration: none; }
+  footer a.ghlink:hover { background: var(--accent-ink); }
+  footer a.ghlink:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+
+  @media (max-width: 720px) {
+    .readout-top { grid-template-columns: 1fr; }
+    .scen, .mech { grid-template-columns: 1fr; }
+    .xaxis span { font-size: 0; }
+    .xaxis span:nth-child(3n+1) { font-size: 9px; }
+  }
+  @media (prefers-reduced-motion: reduce) { #trace { opacity: .35; } }
+</style>
+
+<header>
+  <canvas id="trace" aria-hidden="true"></canvas>
+  <div class="wrap hero">
+    <div class="brand"><span class="dot"></span> <b>SIGNALE</b> <span class="eyebrow" style="color:var(--muted)">/ global impact model</span></div>
+    <h1>What an efficient PC saves — multiplied by a billion machines.</h1>
+    <p class="lede">SignalE cuts the energy a Windows PC wastes and shifts flexible work to cleaner grid hours.
+      One laptop is a rounding error. The global fleet is a climate lever. Here is the honest, ranged math —
+      every figure reproducible from the model in this repository.</p>
+
+    <div class="readout" role="group" aria-label="Live impact estimate">
+      <div class="readout-top">
+        <div class="metric">
+          <div class="label"><span class="swatch" style="background:var(--accent)"></span> Energy saved · per year</div>
+          <div class="big"><span id="energy">2.44</span> <small>TWh/yr</small></div>
+          <div class="band">90% range&nbsp; <span id="energyBand">1.72 – 3.25</span> TWh</div>
+          <div class="rangebar"><i class="fill" id="energyFill"></i><b class="p50dot" id="energyDot"></b></div>
+          <div class="rangelabels"><span>P10</span><span>median</span><span>P90</span></div>
+          <div class="eq">≈ <b id="homes">610k</b> homes' annual electricity</div>
+        </div>
+        <div class="metric">
+          <div class="label"><span class="swatch" style="background:var(--clean)"></span> CO₂ avoided · per year</div>
+          <div class="big"><span id="co2">1.42</span> <small>Mt/yr</small></div>
+          <div class="band">90% range&nbsp; <span id="co2Band">1.01 – 1.90</span> Mt</div>
+          <div class="rangebar"><i class="fill" id="co2Fill"></i><b class="p50dot" id="co2Dot"></b></div>
+          <div class="rangelabels"><span>P10</span><span>median</span><span>P90</span></div>
+          <div class="eq">≈ <b id="cars">309k</b> cars taken off the road</div>
+        </div>
+      </div>
+      <div class="control">
+        <div class="row">
+          <span class="k">Global adoption</span>
+          <span class="v"><span id="adoptVal">25</span>%</span>
+        </div>
+        <input id="adopt" type="range" min="1" max="100" value="25" step="1" aria-label="Global adoption percentage">
+        <div class="ticks"><span>1%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+      </div>
+    </div>
+    <p class="num" style="color:var(--faint);font-size:12px;margin-top:14px">
+      median of 50,000 Monte-Carlo trials · annual · in-use only · net of SignalE's own overhead
+    </p>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Scenarios</span>
+      <h2>From early adopters to the ceiling</h2>
+      <p>The model is linear in adoption, so these are three points on the slider above. The band in each
+        row is the P10–P90 uncertainty range — roughly ±35% around the median.</p>
+    </div>
+    <div class="scen">
+      <div class="card">
+        <div class="tag">Early</div><div class="pct">5%</div>
+        <div class="desc">~70M machines running SignalE.</div>
+        <div class="stat"><span>Energy / yr</span><b>0.49 TWh</b></div>
+        <div class="stat"><span>CO₂ / yr</span><b>0.28 Mt</b></div>
+        <div class="stat"><span>≈ cars off road</span><b>62k</b></div>
+      </div>
+      <div class="card" style="border-color:var(--accent)">
+        <div class="tag">Mainstream</div><div class="pct">25%</div>
+        <div class="desc">Roughly one PC in four.</div>
+        <div class="stat"><span>Energy / yr</span><b>2.44 TWh</b></div>
+        <div class="stat"><span>CO₂ / yr</span><b>1.42 Mt</b></div>
+        <div class="stat"><span>≈ cars off road</span><b>309k</b></div>
+      </div>
+      <div class="card">
+        <div class="tag">Ceiling</div><div class="pct">100%</div>
+        <div class="desc">The full ~1.4B-device fleet.</div>
+        <div class="stat"><span>Energy / yr</span><b>9.76 TWh</b></div>
+        <div class="stat"><span>CO₂ / yr</span><b>5.69 Mt</b></div>
+        <div class="stat"><span>≈ cars off road</span><b>1.24M</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Where it comes from</span>
+      <h2>Which levers save the energy</h2>
+      <p>Illustrative, laptop-weighted. The mix shifts by device and state — on desktops, EcoQoS and
+        the power-mode overlay dominate and the display slice shrinks toward zero. Carbon-aware
+        scheduling saves <em>carbon</em>, not kWh, so it's tracked separately.</p>
+    </div>
+    <div class="origins" id="origins"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Carbon-aware timing</span>
+      <h2>The same kilowatt-hour, drawn at a cleaner hour</h2>
+      <p>Grid carbon intensity swings 3–5× across a day. SignalE green-lights deferrable background work —
+        updates, backups, sync, indexing — during clean hours and holds it back during the dirty evening peak.
+        Below: a representative 24-hour marginal-intensity forecast, tiered by SignalE.</p>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart" id="chart" role="img" aria-label="24-hour grid carbon intensity, colored by SignalE's run/defer tier"></div>
+      <div class="xaxis" id="xaxis"></div>
+      <div class="legend">
+        <span><i style="background:var(--clean)"></i>Green — run deferrable work now</span>
+        <span><i style="background:var(--neutral)"></i>Neutral — hold</span>
+        <span><i style="background:var(--dirty)"></i>Red — defer / throttle harder</span>
+      </div>
+      <div class="callout">Shifting deferrable load from the dirtiest to the cleanest hours cuts
+        <b>that slice's emissions by ~<span id="shiftPct">53</span>%</b>
+        (<span class="num" id="dirtyAvg">428</span> → <span class="num" id="cleanAvg">200</span> gCO₂/kWh) —
+        with no loss of energy and nothing the user is waiting on.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Two effects, counted separately</span>
+      <h2>Why we never double-count</h2>
+    </div>
+    <div class="mech">
+      <div class="card">
+        <h3><span class="k">01</span> Energy reduction</h3>
+        <p>EcoQoS, the power-mode overlay, idle throttling and adaptive brightness make the machine draw
+          fewer watts for the same experience. This removes energy from the grid entirely.</p>
+        <div class="fx">→ measured live via battery discharge rate</div>
+      </div>
+      <div class="card">
+        <h3><span class="k">02</span> Carbon-aware shift</h3>
+        <p>The same deferrable kilowatt-hour, moved out of the dirty peak into a clean hour. It doesn't cut
+          energy — it cuts the <em>emissions</em> of energy that was going to be spent anyway.</p>
+        <div class="fx">→ marginal grid intensity, per region</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Measurement integrity</span>
+      <h2>Rules that keep this out of greenwashing</h2>
+      <p>Inflated climate claims are worse than none. Every number here obeys six rules — the same
+        discipline credible carbon accounting requires.</p>
+    </div>
+    <ul class="rules">
+      <li><span class="check">✓</span><span><b>Additionality.</b> Only energy that would otherwise be drawn is counted, via a per-device causal A/B baseline — not an assumed one.</span></li>
+      <li><span class="check">✓</span><span><b>Measured beats modeled.</b> On battery, savings are measured from real discharge rate; where only modeling is possible it's labeled as such, with wider bands.</span></li>
+      <li><span class="check">✓</span><span><b>Net of overhead.</b> SignalE's own energy cost is always subtracted before anything is claimed.</span></li>
+      <li><span class="check">✓</span><span><b>No peak-as-average.</b> Global figures use time-weighted average savings (~7–10%), never the 10–40% context peaks.</span></li>
+      <li><span class="check">✓</span><span><b>Privacy-preserving fleet data.</b> Opt-in, aggregated on-device with differential privacy — region and totals only, never app or usage detail.</span></li>
+      <li><span class="check">✓</span><span><b>Published method.</b> Open model, every input an editable range, outputs as distributions with visible uncertainty.</span></li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p style="margin:0 0 16px"><a class="ghlink" href="https://github.com/VoxelMafia/signalE-site">SignalE on GitHub&nbsp;→</a> <span style="font-family:var(--mono);font-size:12px;color:var(--faint);margin-left:8px">early technical preview</span></p>
+    Reproduce every figure: <code>python src/impact/impact_model.py</code> ·
+    <code>python src/impact/carbon_aware.py</code>
+    <p class="disclaim">Figures are annual, in-use only, and net of SignalE's own overhead. Fleet size ~1.3–1.5B
+      active Windows 10/11 devices; grid factor 0.35–0.60 t CO₂/MWh; average continuous saving ~7% (desktop)
+      to ~10% (laptop). Ranges reflect P10–P90 Monte-Carlo bounds. Equivalents: 4,000 kWh/home·yr, 4.6 t CO₂/car·yr.</p>
+  </div>
+</footer>
+
+<script>
+  // --- live readout: model is linear in adoption, so scale the 100% medians/bands exactly ---
+  const M = {
+    energy: { p10: 6.864640, p50: 9.762307, p90: 12.996671 }, // TWh/yr at 100%
+    co2:    { p10: 4.035102, p50: 5.691457, p90: 7.612267 },  // Mt/yr at 100%
+  };
+  const KWH_HOME = 4000, CO2_CAR = 4.6;
+  const fmt = (n, d=2) => n.toLocaleString(undefined, {minimumFractionDigits:d, maximumFractionDigits:d});
+  const big = n => n >= 1e9 ? (n/1e9).toFixed(2)+'B' : n >= 1e6 ? (n/1e6).toFixed(2)+'M' : n >= 1e3 ? Math.round(n/1e3)+'k' : Math.round(n);
+
+  const $ = id => document.getElementById(id);
+  const slider = $('adopt');
+  function update() {
+    const a = +slider.value / 100;
+    slider.style.setProperty('--pct', slider.value + '%');
+    $('adoptVal').textContent = slider.value;
+    const e50 = M.energy.p50 * a, c50 = M.co2.p50 * a;
+    $('energy').textContent = fmt(e50);
+    $('energyBand').textContent = fmt(M.energy.p10*a) + ' – ' + fmt(M.energy.p90*a);
+    $('co2').textContent = fmt(c50);
+    $('co2Band').textContent = fmt(M.co2.p10*a) + ' – ' + fmt(M.co2.p90*a);
+    $('homes').textContent = big(e50 * 1e9 / KWH_HOME);
+    $('cars').textContent = big(c50 * 1e6 / CO2_CAR);
+  }
+  slider.addEventListener('input', update);
+  update();
+
+  // uncertainty range bars: positions are constant because the model is linear in adoption
+  function placeRange(m, fillId, dotId) {
+    const l = m.p10 / m.p90 * 100, w = (m.p90 - m.p10) / m.p90 * 100, d = m.p50 / m.p90 * 100;
+    const f = $(fillId); f.style.left = l + '%'; f.style.width = w + '%';
+    $(dotId).style.left = d + '%';
+  }
+  placeRange(M.energy, 'energyFill', 'energyDot');
+  placeRange(M.co2, 'co2Fill', 'co2Dot');
+
+  // savings-origin breakdown (illustrative, laptop-weighted; see docs/IMPACT.md §3.3)
+  const origins = [
+    ['Adaptive brightness / display', 28],
+    ['EcoQoS — efficiency cores + DVFS', 24],
+    ['Idle deep-throttle — park + dim', 22],
+    ['Power-mode overlay / platform', 16],
+    ['Timer-res & wake hygiene, misc', 10],
+  ];
+  const obox = $('origins');
+  origins.forEach(([name, p]) => {
+    const row = document.createElement('div'); row.className = 'origin';
+    row.innerHTML = `<span class="oname">${name}</span>`
+      + `<span class="otrack"><span class="ofill" style="width:${p / 28 * 100}%"></span></span>`
+      + `<span class="opct">${p}%</span>`;
+    obox.appendChild(row);
+  });
+
+  // --- carbon chart: real synthetic-provider curve, tiered by percentile ---
+  const curve = [386,390,386,375,358,335,308,280,252,225,202,185,174,172,182,207,253,319,394,455,484,478,452,426];
+  const sorted = [...curve].sort((x,y)=>x-y);
+  const q = p => { const k=(sorted.length-1)*p, f=Math.floor(k), c=Math.ceil(k); return f===c?sorted[f]:sorted[f]*(c-k)+sorted[c]*(k-f); };
+  const greenCut = q(1/3), redCut = q(2/3);
+  const max = Math.max(...curve), min = Math.min(...curve);
+  const css = getComputedStyle(document.documentElement);
+  const col = { clean: css.getPropertyValue('--clean'), neutral: css.getPropertyValue('--neutral'), dirty: css.getPropertyValue('--dirty') };
+  const chart = $('chart'), xaxis = $('xaxis');
+  const greens = [], reds = [];
+  curve.forEach((v, h) => {
+    const tier = v <= greenCut ? 'clean' : v >= redCut ? 'dirty' : 'neutral';
+    if (tier === 'clean') greens.push(v); if (tier === 'dirty') reds.push(v);
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.height = (12 + (v - min) / (max - min) * 88) + '%';
+    bar.style.background = col[tier];
+    bar.title = `${String(h).padStart(2,'0')}:00 — ${v} gCO₂/kWh (${tier==='clean'?'run':tier==='dirty'?'defer':'hold'})`;
+    chart.appendChild(bar);
+    const x = document.createElement('span'); x.textContent = String(h).padStart(2,'0'); xaxis.appendChild(x);
+  });
+  const avg = arr => arr.reduce((s,x)=>s+x,0)/arr.length;
+  const dirtyAvg = avg(reds), cleanAvg = avg(greens);
+  $('dirtyAvg').textContent = Math.round(dirtyAvg);
+  $('cleanAvg').textContent = Math.round(cleanAvg);
+  $('shiftPct').textContent = Math.round((dirtyAvg - cleanAvg) / dirtyAvg * 100);
+
+  // --- ambient signal trace (the product is 'SignalE') ---
+  const cv = $('trace'), ctx = cv.getContext('2d');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let t = 0, W, H, DPR;
+  function resize() { DPR = Math.min(2, devicePixelRatio||1); W = cv.clientWidth; H = cv.clientHeight; cv.width = W*DPR; cv.height = H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); }
+  function wave(amp, freq, phase, alpha, yb) {
+    const a = css.getPropertyValue('--accent').trim() || '#2ccadd';
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += 6) {
+      const y = yb + Math.sin(x*freq + phase) * amp * Math.sin(x/W*Math.PI);
+      x === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = a; ctx.globalAlpha = alpha; ctx.lineWidth = 1.5; ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    wave(16, 0.011, t,       0.30, H*0.52);
+    wave(26, 0.007, t*0.6+2, 0.16, H*0.6);
+    wave(10, 0.02,  -t*1.3,  0.12, H*0.45);
+    if (!reduce) { t += 0.02; requestAnimationFrame(draw); }
+  }
+  addEventListener('resize', () => { resize(); if (reduce) draw(); });
+  resize(); draw();
+</script>
