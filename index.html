@@ -176,6 +176,33 @@
   footer a.ghlink:hover { background: var(--accent-ink); }
   footer a.ghlink:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
 
+  /* ---- global impact map ---- */
+  .mapsec { padding: 40px 0 30px; border-bottom: 1px solid var(--line); }
+  .maptally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line);
+    border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin-bottom: 18px; box-shadow: var(--shadow); }
+  .maptally .t { background: var(--panel); padding: 16px 20px; }
+  .maptally .t .k { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .maptally .t .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: clamp(22px,4vw,30px); font-weight: 640; letter-spacing: -.02em; margin-top: 4px; }
+  .mapstage { position: relative; background:
+      radial-gradient(120% 90% at 50% 8%, color-mix(in srgb, var(--accent) 8%, var(--panel)) 0%, var(--panel) 70%);
+    border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+  #worldmap { display: block; width: 100%; height: auto; }
+  .maptip { position: absolute; pointer-events: none; z-index: 4; min-width: 190px; max-width: 240px;
+    background: color-mix(in srgb, var(--panel) 88%, transparent); backdrop-filter: blur(6px);
+    border: 1px solid var(--line-strong); border-radius: 11px; padding: 12px 14px; box-shadow: var(--shadow);
+    opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; }
+  .maptip.on { opacity: 1; transform: translateY(0); }
+  .maptip h4 { font-size: 14px; margin: 0 0 8px; display: flex; align-items: center; gap: 7px; }
+  .maptip h4 .pin { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 25%, transparent); }
+  .maptip .r { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; padding: 3px 0; }
+  .maptip .r span { color: var(--muted); }
+  .maptip .r b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .maplegend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .maplegend button { font: inherit; cursor: pointer; font-family: var(--mono); font-size: 11.5px;
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
+  .maplegend button:hover, .maplegend button.active { color: var(--ink); border-color: var(--accent); }
+  .mapnote { color: var(--faint); font-size: 12px; margin-top: 14px; max-width: 70ch; }
+
   @media (max-width: 720px) {
     .readout-top { grid-template-columns: 1fr; }
     .scen, .mech { grid-template-columns: 1fr; }
@@ -227,6 +254,34 @@
     </p>
   </div>
 </header>
+
+<section class="mapsec">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Global impact map</span>
+      <h2>One efficient PC, ×1.4 billion — mapped</h2>
+      <p>At full global adoption, the model's median saving distributed across the Windows fleet by
+        region, with each region's own grid carbon intensity. Hover or tap a node for its share.</p>
+    </div>
+
+    <div class="maptally">
+      <div class="t"><div class="k">Energy saved · potential</div><div class="v"><span id="mTwh">9.8</span> <span style="font-size:.5em;color:var(--muted)">TWh/yr</span></div></div>
+      <div class="t"><div class="k">CO₂ avoided · potential</div><div class="v" style="color:var(--clean)"><span id="mCo2">4.6</span> <span style="font-size:.5em;color:var(--muted)">Mt/yr</span></div></div>
+      <div class="t"><div class="k">≈ cars off the road</div><div class="v"><span id="mCars">1.0M</span></div></div>
+    </div>
+
+    <div class="mapstage">
+      <canvas id="worldmap" role="img" aria-label="World map of SignalE's potential energy savings by region"></canvas>
+      <div class="maptip" id="maptip"></div>
+    </div>
+
+    <div class="maplegend" id="maplegend"></div>
+    <p class="mapnote">Regional fleet shares and grid factors are illustrative (grid intensities in
+      the range reported by IEA/Ember). Totals use the conservative in-use-only model
+      (~9.8 TWh/yr median at full adoption); broader assumptions that also count idle-on hours push
+      toward the 20+ TWh sometimes cited. Every figure traces back to <code>impact_model.py</code>.</p>
+  </div>
+</section>
 
 <section>
   <div class="wrap">
@@ -456,4 +511,152 @@
   }
   addEventListener('resize', () => { resize(); if (reduce) draw(); });
   resize(); draw();
+
+  // ---- Global impact map ----
+  const TOTAL_TWH = 9.762;            // 100%-adoption median, from impact_model.py
+  const CO2_CAR_T = 4.6;
+  const mRegions = [
+    { name:'North America',       lat:40,  lon:-100, share:0.20, grid:370 },
+    { name:'Europe',              lat:50,  lon:12,   share:0.22, grid:250 },
+    { name:'East Asia',           lat:35,  lon:116,  share:0.24, grid:550 },
+    { name:'South Asia',          lat:22,  lon:78,   share:0.09, grid:630 },
+    { name:'Southeast Asia',      lat:3,   lon:112,  share:0.06, grid:500 },
+    { name:'Latin America',       lat:-12, lon:-58,  share:0.08, grid:230 },
+    { name:'Middle East & Africa',lat:8,   lon:34,   share:0.07, grid:500 },
+    { name:'Oceania',             lat:-27, lon:134,  share:0.04, grid:520 },
+  ];
+  mRegions.forEach(r => { r.twh = TOTAL_TWH * r.share; r.co2 = r.twh * r.grid / 1000; r.cars = r.co2*1e6/CO2_CAR_T; });
+  const mSum = k => mRegions.reduce((s,r)=>s+r[k],0);
+  const bigN = n => n>=1e9?(n/1e9).toFixed(2)+'B':n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?Math.round(n/1e3)+'k':Math.round(n);
+  $('mTwh').textContent  = mSum('twh').toFixed(1);
+  $('mCo2').textContent  = mSum('co2').toFixed(1);
+  $('mCars').textContent = bigN(mSum('cars'));
+
+  // stylised dotted world from continent blobs (self-contained; no external geometry)
+  const mBlobs = [
+    [54,-100,20,32],[38,-96,13,22],[62,-145,12,22],
+    [-15,-60,25,15],[-33,-64,9,7],
+    [52,12,12,20],[62,22,8,26],
+    [6,20,30,22],
+    [50,90,24,48],[62,102,15,40],[24,78,12,17],
+    [3,112,9,20],
+    [-25,133,11,17],
+  ];
+  const inLand = (lat,lon) => mBlobs.some(([bl,bo,dl,doo]) => {
+    const a=(lat-bl)/dl, b=(lon-bo)/doo; return a*a+b*b <= 1;
+  });
+
+  const mCanvas = $('worldmap'), mCtx = mCanvas.getContext('2d'), mTip = $('maptip');
+  let mW, mH, mDpr, mLand, mDots, mHover = null, mSel = null, mt = 0;
+  const proj = (lat,lon,w,h) => [ (lon+180)/360*w, (90-lat)/180*h ];
+
+  function mBuild() {
+    mDpr = Math.min(2, devicePixelRatio||1);
+    mW = mCanvas.clientWidth || (mCanvas.parentElement && mCanvas.parentElement.clientWidth) || 900;
+    mH = Math.round(mW * 0.52);
+    mCanvas.style.height = mH + 'px';
+    mCanvas.width = mW*mDpr; mCanvas.height = mH*mDpr;
+    mCtx.setTransform(mDpr,0,0,mDpr,0,0);
+    // pre-render land dots to an offscreen canvas
+    mLand = document.createElement('canvas'); mLand.width = mW*mDpr; mLand.height = mH*mDpr;
+    const lc = mLand.getContext('2d'); lc.setTransform(mDpr,0,0,mDpr,0,0);
+    const dot = (css.getPropertyValue('--muted')||'#8ba0a0').trim();
+    const step = Math.max(2.0, 2.6 - mW/900);
+    mDots = [];
+    for (let lat=78; lat>=-58; lat-=step) {
+      for (let lon=-180; lon<=180; lon+=step) {
+        if (!inLand(lat,lon)) continue;
+        const [x,y] = proj(lat+ (Math.random()-.5)*step*0.5, lon+(Math.random()-.5)*step*0.5, mW, mH);
+        mDots.push([x,y]);
+      }
+    }
+    lc.fillStyle = dot;
+    for (const [x,y] of mDots) { lc.globalAlpha = 0.5; lc.beginPath(); lc.arc(x,y,0.9,0,7); lc.fill(); }
+    lc.globalAlpha = 1;
+    // cache node screen positions + radius (∝ sqrt share)
+    const rMax = Math.max(...mRegions.map(r=>r.share));
+    mRegions.forEach(r => {
+      const [x,y] = proj(r.lat, r.lon, mW, mH); r.x=x; r.y=y;
+      r.r = 6 + 20*Math.sqrt(r.share/rMax);
+    });
+  }
+
+  function mDraw() {
+    mCtx.clearRect(0,0,mW,mH);
+    mCtx.drawImage(mLand, 0,0, mW, mH);
+    const acc = (css.getPropertyValue('--accent')||'#2ccadd').trim();
+    const clean = (css.getPropertyValue('--clean')||'#43c07a').trim();
+    // connective arcs (subtle)
+    mCtx.strokeStyle = acc; mCtx.globalAlpha = 0.10; mCtx.lineWidth = 1;
+    for (let i=0;i<mRegions.length;i++){ const a=mRegions[i], b=mRegions[(i+1)%mRegions.length];
+      mCtx.beginPath(); mCtx.moveTo(a.x,a.y);
+      mCtx.quadraticCurveTo((a.x+b.x)/2,(a.y+b.y)/2-40,b.x,b.y); mCtx.stroke(); }
+    mCtx.globalAlpha = 1;
+    mRegions.forEach((r,i) => {
+      const pulse = reduce ? 0.5 : (0.5 + 0.5*Math.sin(mt*0.05 + i));
+      const isOn = (mHover===r || mSel===r);
+      // glow halo
+      const g = mCtx.createRadialGradient(r.x,r.y,0,r.x,r.y,r.r*2.4);
+      g.addColorStop(0, acc); g.addColorStop(1, 'transparent');
+      mCtx.globalAlpha = 0.14 + 0.12*pulse + (isOn?0.15:0); mCtx.fillStyle = g;
+      mCtx.beginPath(); mCtx.arc(r.x,r.y,r.r*2.4,0,7); mCtx.fill();
+      // ring
+      mCtx.globalAlpha = isOn?1:0.85; mCtx.strokeStyle = isOn?clean:acc; mCtx.lineWidth = isOn?2.5:1.5;
+      mCtx.beginPath(); mCtx.arc(r.x,r.y,r.r,0,7); mCtx.stroke();
+      // core
+      mCtx.globalAlpha = 1; mCtx.fillStyle = acc;
+      mCtx.beginPath(); mCtx.arc(r.x,r.y, Math.max(2,r.r*0.28),0,7); mCtx.fill();
+    });
+    mCtx.globalAlpha = 1;
+    if (!reduce) { mt++; requestAnimationFrame(mDraw); }
+  }
+
+  function mShowTip(r, clientX) {
+    if (!r) { mTip.classList.remove('on'); return; }
+    mTip.innerHTML = `<h4><span class="pin"></span>${r.name}</h4>`
+      + `<div class="r"><span>Fleet share</span><b>${Math.round(r.share*100)}%</b></div>`
+      + `<div class="r"><span>Energy saved</span><b>${r.twh.toFixed(2)} TWh/yr</b></div>`
+      + `<div class="r"><span>Grid intensity</span><b>${r.grid} g/kWh</b></div>`
+      + `<div class="r"><span>CO₂ avoided</span><b>${r.co2.toFixed(2)} Mt/yr</b></div>`
+      + `<div class="r"><span>≈ cars off road</span><b>${bigN(r.cars)}</b></div>`;
+    const stage = mCanvas.getBoundingClientRect();
+    let left = r.x + 16; if (left > mW-250) left = r.x - 250;
+    let top = Math.min(Math.max(r.y - 40, 8), mH - 170);
+    mTip.style.left = left + 'px'; mTip.style.top = top + 'px';
+    mTip.classList.add('on');
+  }
+
+  function mPick(mx, my) {
+    let best=null, bd=1e9;
+    for (const r of mRegions) { const d=Math.hypot(mx-r.x,my-r.y); if (d<Math.max(22,r.r+10) && d<bd){bd=d;best=r;} }
+    return best;
+  }
+  mCanvas.addEventListener('mousemove', e => {
+    const b = mCanvas.getBoundingClientRect();
+    mHover = mPick(e.clientX-b.left, e.clientY-b.top);
+    mCanvas.style.cursor = mHover ? 'pointer' : 'default';
+    mShowTip(mHover || mSel);
+  });
+  mCanvas.addEventListener('mouseleave', () => { mHover=null; mShowTip(mSel); });
+  mCanvas.addEventListener('click', e => {
+    const b = mCanvas.getBoundingClientRect();
+    mSel = mPick(e.clientX-b.left, e.clientY-b.top);
+    mShowTip(mSel); mSyncLegend();
+  });
+
+  // legend chips
+  const mLeg = $('maplegend');
+  mRegions.forEach(r => {
+    const btn = document.createElement('button'); btn.textContent = `${r.name} · ${Math.round(r.share*100)}%`;
+    btn.addEventListener('click', () => { mSel = (mSel===r?null:r); mShowTip(mSel); mSyncLegend();
+      if (mSel) { const b=mCanvas.getBoundingClientRect(); mShowTip(mSel); } });
+    r._btn = btn; mLeg.appendChild(btn);
+  });
+  function mSyncLegend(){ mRegions.forEach(r => r._btn.classList.toggle('active', mSel===r)); }
+
+  function mResize(){ mBuild(); if (reduce) mDraw(); }
+  addEventListener('resize', mResize);
+  addEventListener('load', mResize);
+  mBuild(); mDraw();
+  requestAnimationFrame(mResize);   // rebuild once layout has settled (canvas width known)
 </script>
